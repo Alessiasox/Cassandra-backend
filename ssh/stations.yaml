@@ -1,0 +1,5 @@
+Duronia:
+  host:        100.76.133.15
+  port:        22
+  username:    User
+  remote_base: C:/htdocs/VLF

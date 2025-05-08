@@ -1,0 +1,24 @@
+// cassandrabackend/.devcontainer/devcontainer.json
+{
+    "name": "Cassandra Dev Container",
+    "build": {
+      "dockerfile": "../Dockerfile",
+      "context": ".."
+    },
+    "workspaceFolder": "/workspace",
+    "runArgs": [
+      "--cap-add=SYS_ADMIN",   // needed for sshfs
+      "--device=/dev/fuse"
+    ],
+    "forwardPorts": [8000, 8501, 5432],
+    "settings": {
+      "terminal.integrated.shell.linux": "/bin/bash"
+    },
+    "extensions": [
+      "ms-python.python",
+      "ms-python.vscode-pylance",
+      "ms-azuretools.vscode-docker"
+    ],
+    "postCreateCommand": "pip install --no-cache-dir -r requirements.txt",
+    "remoteUser": "root"
+  }
