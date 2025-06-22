@@ -1,58 +1,52 @@
 services:
-  postgres:
-    image: postgres:15
-    env_file: .env
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 2s
-      timeout: 2s
-      retries: 10
-
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cassandra_app
     env_file: .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-    # expose port 8000 to your host
-    ports:
-      - "8000:8000"
-    # if still need SSHFS inside:
-    # devices: ["/dev/fuse:/dev/fuse"]
-    # cap_add: ["SYS_ADMIN"]
-    # security_opt: ["apparmor:unconfined"]
-    volumes:
-      - .:/app:cached
-    entrypoint: ["/app/scripts/entrypoint.sh"]
-    command: >
-      uvicorn backend.app:app --host 0.0.0.0 --port 8000
+    volumes: # The app only needs the ssh key to list remote files
+      - ./ssh:/app/ssh:ro
+    networks:
+      - cassandra-network
+    command: ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    restart: unless-stopped
 
   proxy:
-    image: nginx:stable
+    build:
+      context: .
+      dockerfile: proxy/Dockerfile
+    container_name: cassandra_proxy
     env_file: .env
-    depends_on: [app]
-    volumes:
-      # serve the very same VLF volume
-      - vlf-vol:/usr/share/nginx/html:ro
-      - ./proxy/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "8080:80"
+    volumes:
+      - ./proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssh:/app/ssh:ro # The entrypoint script needs the key
+    networks:
+      - cassandra-network
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+    privileged: true
+    restart: unless-stopped
 
   ui:
     build: .
     env_file: .env
     working_dir: /app
-    depends_on: [app]
-    volumes:
-      - .:/app:cached
+    depends_on:
+      - app
     ports:
       - "8501:8501"
     command:
       ["streamlit", "run", "ui/streamlit_app.py",
        "--server.port", "8501", "--server.address", "0.0.0.0"]
+    networks:
+      - cassandra-network
+    restart: unless-stopped
 
-volumes:
-  pgdata:
-  vlf-vol:
+networks:
+  cassandra-network:
+    driver: bridge

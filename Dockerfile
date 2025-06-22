@@ -11,7 +11,12 @@ RUN apt-get update && \
         openssh-client \
         sshfs \            
         postgresql-client \
+        fuse3 \
  && rm -rf /var/lib/apt/lists/*
+
+# --- Create FUSE device and set permissions ------------------
+RUN mkdir -p /dev/fuse && \
+    chmod 666 /dev/fuse
 
 # --- Python deps ----------------------------------------------
 WORKDIR /app
