@@ -41,14 +41,15 @@ def health():
 @app.get("/frames", response_model=list[Frame])
 def list_frames_on_demand(date: str = Query(..., description="Date in YYMMDD format, e.g., 250411")):
     """
-    Lists frames for a specific date by running a remote command over SSH.
+    Lists frames for a specific date by running specific, non-recursive remote commands.
     """
     if not all([SSH_HOST, SSH_USER, SSH_PRIVATE_KEY_PATH, REMOTE_DIR]):
         raise HTTPException(status_code=500, detail="SSH environment variables not set.")
 
-    # Build the remote command to search for files
-    search_pattern = f"{REMOTE_DIR.replace('/', os.path.sep)}\\*T_{date}*.jpg"
-    command = f'dir /s /b "{search_pattern}"'
+    # Build two specific, non-recursive commands for LoRes and HiRes
+    lores_path = f"{REMOTE_DIR.replace('/', os.path.sep)}\\LoRes\\*T_{date}*.jpg"
+    hires_path = f"{REMOTE_DIR.replace('/', os.path.sep)}\\HiRes\\*T_{date}*.jpg"
+    command = f'dir /b "{lores_path}" & dir /b "{hires_path}"'
 
     try:
         client = paramiko.SSHClient()
@@ -92,9 +93,19 @@ def list_frames_on_demand(date: str = Query(..., description="Date in YYMMDD for
         
         # Normalize both paths to use forward slashes for reliable replacement
         normalized_line = line.strip().replace("\\", "/")
+        
+        # The new dir command only returns filenames, so we must prepend the path.
+        if "LoRes" in normalized_line:
+            base_path = f"{REMOTE_DIR}/LoRes"
+        elif "HiRes" in normalized_line:
+            base_path = f"{REMOTE_DIR}/HiRes"
+        else:
+            continue # Should not happen
+
+        full_path = f"{base_path}/{normalized_line}"
         normalized_base = REMOTE_DIR.replace("\\", "/")
         
-        relative_path = normalized_line.replace(normalized_base, "", 1).strip("/")
+        relative_path = full_path.replace(normalized_base, "", 1).strip("/")
         url = f"{FILE_SERVER_URL}/{relative_path}"
 
         frames.append(Frame(station=station, resolution=resolution, timestamp=ts, url=url))

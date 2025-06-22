@@ -4,16 +4,16 @@ set -euo pipefail
 MOUNT_POINT=${1:-$(pwd)/vlfstore}
 CONFIG_FILE="$(dirname "$0")/../ssh/stations.yaml"
 
-# ── 1. make sure sshfs exists ─────────────────────────────────────────
+# Check if sshfs exists
 command -v sshfs >/dev/null || {
-  echo "❌ sshfs not found. Install macFUSE + sshfs first." >&2
+  echo "sshfs not found. Install macFUSE + sshfs first." >&2
   exit 1
 }
 
 mkdir -p "$MOUNT_POINT"
 
-# ── 2. very small YAML parser (only the fields we care about) ─────────
-# expected format:
+# Simple YAML parser for station configuration
+# Expected format:
 # Duronia:
 #   host: 100.76.133.15
 #   username: vlffetch
@@ -36,20 +36,20 @@ while IFS=: read -r key value; do
   esac
 done < "$CONFIG_FILE"
 
-# ── 3. mount each station ─────────────────────────────────────────────
+# Mount each station
 for st in "${!host[@]}"; do
   local_dir="$MOUNT_POINT/$st"
   mkdir -p "$local_dir"
 
   ssh_key=${key[$st]:-$HOME/.ssh/id_ed25519}
 
-  # already mounted?
+  # Check if already mounted
   if mount | grep -q " $local_dir "; then
-    echo "✔ $st already mounted"
+    echo "$st already mounted"
     continue
   fi
 
-  echo "⏳ mounting $st → $local_dir"
+  echo "Mounting $st to $local_dir"
   sshfs \
     -o IdentityFile="$ssh_key" \
     -o allow_other \

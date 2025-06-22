@@ -36,7 +36,7 @@ if ! mountpoint -q "${MOUNT_POINT}"; then
     tail -f /dev/null
 fi
 
-echo "✔ Mount successful. Starting Nginx..."
+echo "Mount successful. Starting Nginx..."
 
 # Start nginx in the foreground.
 # This will keep the container running.

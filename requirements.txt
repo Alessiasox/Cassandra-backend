@@ -4,3 +4,5 @@ streamlit
 requests
 paramiko
 pytest
+pandas
+PyYAML
