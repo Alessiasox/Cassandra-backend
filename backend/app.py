@@ -8,7 +8,7 @@ import paramiko
 
 # --- Environment and Configuration ---
 
-FILE_SERVER_URL = os.getenv("FILE_SERVER_URL", "http://localhost:8080")
+FILE_SERVER_URL = os.getenv("FILE_SERVER_URL", "http://proxy")
 SSH_HOST = os.getenv("SSH_HOST")
 SSH_USER = os.getenv("SSH_USER")
 SSH_PRIVATE_KEY_PATH = os.getenv("SSH_PRIVATE_KEY_PATH")
@@ -41,15 +41,14 @@ def health():
 @app.get("/frames", response_model=list[Frame])
 def list_frames_on_demand(date: str = Query(..., description="Date in YYMMDD format, e.g., 250411")):
     """
-    Lists frames for a specific date by running specific, non-recursive remote commands.
+    Lists frames for a specific date by running a remote command over SSH.
     """
     if not all([SSH_HOST, SSH_USER, SSH_PRIVATE_KEY_PATH, REMOTE_DIR]):
         raise HTTPException(status_code=500, detail="SSH environment variables not set.")
 
-    # Build two specific, non-recursive commands for LoRes and HiRes
-    lores_path = f"{REMOTE_DIR.replace('/', os.path.sep)}\\LoRes\\*T_{date}*.jpg"
-    hires_path = f"{REMOTE_DIR.replace('/', os.path.sep)}\\HiRes\\*T_{date}*.jpg"
-    command = f'dir /b "{lores_path}" & dir /b "{hires_path}"'
+    # Build the remote command to search for files
+    search_pattern = f"{REMOTE_DIR.replace('/', os.path.sep)}\\*T_{date}*.jpg"
+    command = f'dir /s /b "{search_pattern}"'
 
     try:
         client = paramiko.SSHClient()
@@ -75,7 +74,8 @@ def list_frames_on_demand(date: str = Query(..., description="Date in YYMMDD for
     # --- Parse the results ---
     frames: list[Frame] = []
     for line in stdout_lines:
-        filename = os.path.basename(line.strip())
+        full_path = line.strip().replace('\\', '/')
+        filename = os.path.basename(full_path)
         
         m_lores = LORES_RE.match(filename)
         m_hires = HIRES_RE.match(filename)
@@ -91,21 +91,11 @@ def list_frames_on_demand(date: str = Query(..., description="Date in YYMMDD for
         else:
             continue
         
-        # Normalize both paths to use forward slashes for reliable replacement
-        normalized_line = line.strip().replace("\\", "/")
-        
-        # The new dir command only returns filenames, so we must prepend the path.
-        if "LoRes" in normalized_line:
-            base_path = f"{REMOTE_DIR}/LoRes"
-        elif "HiRes" in normalized_line:
-            base_path = f"{REMOTE_DIR}/HiRes"
-        else:
-            continue # Should not happen
-
-        full_path = f"{base_path}/{normalized_line}"
-        normalized_base = REMOTE_DIR.replace("\\", "/")
-        
-        relative_path = full_path.replace(normalized_base, "", 1).strip("/")
+        normalized_remote_dir = REMOTE_DIR.replace('\\', '/')
+        if normalized_remote_dir.endswith('/'):
+            normalized_remote_dir = normalized_remote_dir[:-1]
+            
+        relative_path = full_path.replace(normalized_remote_dir, '', 1).lstrip('/')
         url = f"{FILE_SERVER_URL}/{relative_path}"
 
         frames.append(Frame(station=station, resolution=resolution, timestamp=ts, url=url))

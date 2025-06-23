@@ -7,8 +7,10 @@ import time
 
 # --- Configuration ---
 BACKEND_API_URL = "http://app:8000"
-PROXY_URL = "http://proxy:80"
+PROXY_URL = "http://proxy"
 TESTS_OUTPUT_DIR = os.path.dirname(__file__)
+MAX_WAIT_TIME = 60  # seconds
+CHECK_INTERVAL = 2  # seconds
 
 # --- Global performance tracking ---
 performance_data = {
@@ -292,4 +294,28 @@ def test_save_performance_report():
     print("\n[Test] Saving performance report...")
     save_performance_report()
     print("  [Result] Performance report saved successfully")
+
+def check_service_readiness(url, service_name):
+    """Polls a service's health endpoint until it's ready or timeout."""
+    start_time = time.time()
+    while time.time() - start_time < MAX_WAIT_TIME:
+        try:
+            response = requests.get(f"{url}/health", timeout=5)
+            if response.status_code == 200:
+                print(f"✅ {service_name} is ready.")
+                return True
+        except requests.exceptions.RequestException:
+            print(f"⏳ Waiting for {service_name} to be ready...")
+            time.sleep(CHECK_INTERVAL)
+    print(f"❌ {service_name} failed to become ready within {MAX_WAIT_TIME} seconds.")
+    return False
+
+@pytest.fixture(scope="session", autouse=True)
+def wait_for_services():
+    """Pytest fixture to ensure all services are ready before any tests run."""
+    app_ready = check_service_readiness(BACKEND_API_URL, "Backend App")
+    proxy_ready = check_service_readiness(PROXY_URL, "Proxy")
+    
+    if not (app_ready and proxy_ready):
+        pytest.fail("One or more services failed to start.", pytrace=False)
 

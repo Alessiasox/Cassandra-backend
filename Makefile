@@ -19,6 +19,7 @@ start: build
 # Run API tests and copy results
 test:
 	@echo "Running tests from inside the app container..."
+	@sleep 10 # Wait for services to be ready
 	$(DC) exec app pytest -v tests/run_backend_test.py
 	@echo "Copying downloaded images to local tests directory..."
 	@docker cp cassandra_app:/app/tests/test_lores.jpg tests/ 2>/dev/null || echo "  test_lores.jpg not found (no LoRes frames available)"

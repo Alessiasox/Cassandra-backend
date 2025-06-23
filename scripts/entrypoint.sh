@@ -41,3 +41,16 @@ echo "Mount successful. Starting Nginx..."
 # Start nginx in the foreground.
 # This will keep the container running.
 exec nginx -g 'daemon off;'
+
+# Start a background process to auto-remount if SSHFS drops
+(
+  while true; do
+    sleep 30
+    if ! mountpoint -q "${MOUNT_POINT}"; then
+      echo "[Auto-Remount] SSHFS mount lost, remounting..."
+      fusermount -u "${MOUNT_POINT}" 2>/dev/null || true
+      sshfs -o allow_other -o reconnect -o StrictHostKeyChecking=no -o LogLevel=DEBUG3 -o identityfile=/app/ssh/id_ed25519 "${SSH_USER}@${SSH_HOST}:${REMOTE_DIR}" "${MOUNT_POINT}"
+      echo "[Auto-Remount] Remount attempt finished."
+    fi
+  done
+) &

@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: cassandra_app
     env_file: .env
+    environment:
+      - FILE_SERVER_URL=http://localhost:8080
     volumes: # The app only needs the ssh key to list remote files
       - ./ssh:/app/ssh:ro
     networks:
@@ -35,13 +37,15 @@ services:
   ui:
     build: .
     env_file: .env
+    environment:
+      - FILE_SERVER_URL=http://localhost:8080
     working_dir: /app
     depends_on:
       - app
     ports:
       - "8501:8501"
     command:
-      ["streamlit", "run", "ui/streamlit_app.py",
+      ["python", "-m", "streamlit", "run", "ui/streamlit_app.py",
        "--server.port", "8501", "--server.address", "0.0.0.0"]
     networks:
       - cassandra-network

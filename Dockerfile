@@ -22,6 +22,7 @@ COPY . /app
 
 ENV PYTHONUNBUFFERED=1                  \
     PYTHONDONTWRITEBYTECODE=1           \
-    STATIONS_CONFIG=/app/ssh/stations.yaml
+    STATIONS_CONFIG=/app/ssh/stations.yaml \
+    PYTHONPATH=/app
 
 CMD [ "python", "--version" ]

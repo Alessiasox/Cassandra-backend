@@ -1,8 +1,28 @@
+import sys
+import os
+
+# --- Forcefully Add Project Root to Path ---
+# This is a robust way to ensure that relative imports work, especially in
+# environments like Streamlit where the script execution context can be tricky.
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import streamlit as st
 import requests
-from datetime import datetime, date, timedelta
 import pandas as pd
-import yaml
+from datetime import datetime, date, timedelta
+
+from ui.controls import render_sidebar_controls
+from ui.tabs.spectrograms import render_spectrograms_tab
+from ui.tabs.waveform import render_waveform_tab
+from ui.tabs.logs import render_logs_tab
+from ui.utils.viewer_utils import generate_timeline
+
+# --- Image Display Helper ---
+def _show_image(img_meta, caption: str):
+    """A helper to display images with error handling."""
+    st.image(img_meta["url"], caption=caption, use_container_width=True)
 
 # --- Page Config ---
 st.set_page_config(
@@ -35,142 +55,92 @@ def get_frames_from_backend(selected_date: date) -> list:
         ss.logs.append(f"ERROR: {e}")
         return []
 
-# --- UI Helper Functions ---
-def get_station_list() -> list:
-    """Loads station list from the YAML file."""
-    try:
-        with open("ssh/stations.yaml", 'r') as f:
-            stations_config = yaml.safe_load(f)
-            return list(stations_config.keys()) if stations_config else []
-    except FileNotFoundError:
-        st.sidebar.error("stations.yaml not found.")
-        return ["default"]
-    except Exception as e:
-        st.sidebar.error(f"Error reading stations.yaml: {e}")
-        return ["default"]
-
-def render_sidebar():
-    """Renders the sidebar controls and returns selected values."""
-    with st.sidebar:
-        st.header("Control Panel")
-        station = st.selectbox("Station", get_station_list())
-        st.markdown("---")
-        st.markdown("Source Folder: VLF (on-demand)")
-        st.markdown("---")
-        selected_date = st.date_input("Date", datetime.now())
-        st.markdown("---")
-        st.header("Download Options")
-        st.warning("Download buttons are not yet implemented.")
-        st.button("Download All Files", disabled=True)
-        st.button("Download LoRes WAV", disabled=True)
-        st.button("Download HiRes WAV", disabled=True)
-        return station, selected_date
-
-def render_spectrograms_tab(frames: list, window_start: datetime, window_end: datetime):
-    """Renders the spectrograms tab content within a specific time window."""
-    st.subheader("Spectrograms")
-
-    df = pd.DataFrame(frames)
-    if df.empty:
-        st.info("No frames found for the selected date. Try another date.")
-        return
-        
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
+def main():
+    # --- Initialize Session State ---
+    if 'logs' not in ss: ss.logs = []
     
-    window_frames = df[(df['timestamp'] >= window_start) & (df['timestamp'] < window_end)]
-    
-    lores_frames = window_frames[window_frames['resolution'] == 'LoRes'].sort_values('timestamp')
-    hires_frames = window_frames[window_frames['resolution'] == 'HiRes'].sort_values('timestamp')
-
-    st.markdown(f"**Displaying window: {window_start.strftime('%H:%M')} - {window_end.strftime('%H:%M')}**")
-
-    if not lores_frames.empty:
-        st.markdown(f"**LoRes frame for this hour:**")
-        st.image(lores_frames.iloc[0]['url'], caption=f"LoRes - {lores_frames.iloc[0]['timestamp']}")
-    else:
-        st.info("No LoRes frame available for this hour.")
-
-    st.markdown("---")
-    st.markdown(f"**HiRes frames in this hour: {len(hires_frames)}**")
-    for _, frame in hires_frames.iterrows():
-        st.image(frame['url'], caption=f"HiRes - {frame['timestamp']}", width=300)
-
-def render_waveform_tab():
-    st.warning("Waveform and AI features are not yet implemented.")
-
-def render_logs_tab():
-    st.header("Session Logs")
-    if ss.logs:
-        st.code("\n".join(reversed(ss.logs)))
-    else:
-        st.info("No log messages yet.")
-
-# --- Main App ---
-st.title("INGV Cassandra Project")
-st.caption(
-    """
-**Cassandra** is an internal visualization and analysis toolkit developed for the INGV Experimental VLF Network.
-It allows you to:
-- Browse spectrograms from multiple stations (LoRes: hourly, HiRes: ~40s)
-- Explore and play raw waveform `.wav` audio files
-- Run (or simulate) AI-based signal classification
-- Download any combination of files for offline use
-"""
-)
-
-station, selected_date = render_sidebar()
-all_frames_for_day = get_frames_from_backend(selected_date)
-
-available_hours = []
-if all_frames_for_day:
-    df = pd.DataFrame(all_frames_for_day)
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
-    available_hours = sorted(list(
-        df[df['resolution'] == 'LoRes']['timestamp'].dt.floor('H').unique()
-    ))
-
-if not available_hours:
-    st.warning("No LoRes frames found for the selected date to define hourly windows.")
-else:
-    if ss.lores_hour.date() != selected_date:
-        ss.lores_hour = available_hours[0]
-
-    current_hour_index = available_hours.index(ss.lores_hour)
-    
-    c1, c2, c3 = st.columns([1, 6, 1])
-    with c1:
-        st.button(
-            "1 h earlier",
-            disabled=current_hour_index == 0,
-            on_click=lambda: ss.update(lores_hour=available_hours[current_hour_index - 1]),
-            use_container_width=True
-        )
-    with c2:
-        ss.lores_hour = st.selectbox(
-            "Time window",
-            available_hours,
-            index=current_hour_index,
-            format_func=lambda dt: dt.strftime("%Y-%m-%d %H:%M"),
-            label_visibility="collapsed"
-        )
-    with c3:
-        st.button(
-            "1 h later",
-            disabled=current_hour_index == len(available_hours) - 1,
-            on_click=lambda: ss.update(lores_hour=available_hours[current_hour_index + 1]),
-            use_container_width=True
-        )
-    
-    window_start = ss.lores_hour
-    window_end = window_start + timedelta(hours=1)
-
-    tab_spec, tab_wav, tab_logs = st.tabs(
-        ["Spectrograms", "Waveform + AI", "Logs"]
+    st.title("INGV Cassandra Project")
+    st.caption(
+        """
+        **Cassandra** is an internal visualization and analysis toolkit for the INGV Experimental VLF Network.
+        Use the control panel to configure your source folders, time ranges, and station of interest.
+        """
     )
+    
+    # --- Sidebar and Data Loading ---
+    station, selected_date, mode = render_sidebar_controls()
+    all_frames = get_frames_from_backend(selected_date)
+
+    if not all_frames:
+        st.error("No data found for this station/date.")
+        return
+
+    # --- Timeline and Window Controls ---
+    lores_frames = [f for f in all_frames if f['resolution'] == 'LoRes']
+    all_timestamps = [datetime.fromisoformat(f['timestamp']) for f in lores_frames]
+    
+    if not all_timestamps:
+        st.warning("No LoRes frames found to build timeline.")
+        # Render tabs with empty data
+        render_spectrograms_tab(all_frames=all_frames, control_mode=mode, window_start=datetime.now(), window_end=datetime.now(), session_state=ss)
+        return
+
+    dt0 = min(all_timestamps)
+    dt1 = max(all_timestamps)
+    
+    timeline = generate_timeline(dt0, dt1, 5)
+    
+    def find_closest(target_dt, dt_list):
+        return min(dt_list, key=lambda dt: abs(dt - target_dt))
+
+    if "range_slider" not in ss:
+        default_start = find_closest(dt0, timeline)
+        default_end = find_closest(dt0 + timedelta(hours=1), timeline)
+        ss.range_slider = (default_start, default_end)
+    
+    ss.setdefault("lores_hour", dt0.replace(minute=0, second=0, microsecond=0))
+
+    if mode == "Use slider":
+        current_start, current_end = ss.range_slider
+        if current_start not in timeline or current_end not in timeline:
+             current_start = find_closest(current_start, timeline)
+             current_end = find_closest(current_end, timeline)
+
+        rng_start, rng_end = st.select_slider(
+            "Time window",
+            options=timeline,
+            value=(current_start, current_end),
+            format_func=lambda dt: dt.strftime("%H:%M"),
+            key="range_slider"
+        )
+        ss["lores_hour"] = rng_start.replace(minute=0, second=0, microsecond=0)
+    else: # "Use hour picker"
+        lo_hours = sorted({ts.replace(minute=0, second=0, microsecond=0) for ts in all_timestamps})
+        if ss["lores_hour"] not in lo_hours:
+            ss["lores_hour"] = lo_hours[0]
+
+        current_hour_index = lo_hours.index(ss["lores_hour"])
+
+        c1, c2, c3 = st.columns([1, 6, 1], gap="small")
+        with c1:
+            st.button("◀ 1h", disabled=(current_hour_index == 0), on_click=lambda: ss.update(lores_hour=lo_hours[current_hour_index - 1]), use_container_width=True)
+        with c2:
+            ss["lores_hour"] = st.selectbox("LoRes hour", lo_hours, index=current_hour_index, format_func=lambda dt: dt.strftime("%H:%M"), label_visibility="collapsed")
+        with c3:
+            st.button("1h ▶", disabled=(current_hour_index == len(lo_hours) - 1), on_click=lambda: ss.update(lores_hour=lo_hours[current_hour_index + 1]), use_container_width=True)
+        
+        rng_start = ss["lores_hour"]
+        rng_end = rng_start + timedelta(hours=1)
+
+    # --- Render Tabs ---
+    tab_spec, tab_wav, tab_logs = st.tabs(["Spectrograms", "Waveform + AI", "Logs"])
 
     with tab_spec:
-        render_spectrograms_tab(all_frames_for_day, window_start, window_end)
+        render_spectrograms_tab(all_frames=all_frames, control_mode=mode, window_start=rng_start, window_end=rng_end, session_state=ss)
     with tab_wav:
-        render_waveform_tab()
+        render_waveform_tab(ss=ss)
     with tab_logs:
-        render_logs_tab()
+        render_logs_tab(ss=ss)
+
+if __name__ == "__main__":
+    main()
