@@ -1,5 +1,5 @@
-Duronia:
-  host:        100.76.133.15
+CampiFlegrei:
+  host:        100.120.212.102
   port:        22
-  username:    User
+  username:    adriano
   remote_base: C:/htdocs/VLF

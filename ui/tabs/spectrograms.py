@@ -31,8 +31,7 @@ def render_spectrograms_tab(
         ]
         st.markdown(f"**LoRes frames in window:** {len(lo_to_show)}")
         for img in sorted(lo_to_show, key=lambda x: x["timestamp"]):
-            st.write("LoRes image URL:", img["url"])
-            st.image(img["url"], caption=datetime.fromisoformat(img["timestamp"]).strftime("%H:%M"), use_column_width=True)
+            st.image(img["url"], caption=datetime.fromisoformat(img["timestamp"]).strftime("%H:%M"), use_container_width=True)
 
     else:  # hour-picker: exactly one low-res frame
         target_hour = session_state["lores_hour"]
@@ -42,7 +41,7 @@ def render_spectrograms_tab(
             None
         )
         if img:
-            st.image(img["url"], caption=datetime.fromisoformat(img["timestamp"]).strftime("%H:%M"), use_column_width=True)
+            st.image(img["url"], caption=datetime.fromisoformat(img["timestamp"]).strftime("%H:%M"), use_container_width=True)
         else:
             st.warning("No LoRes frame for selected hour.")
 
@@ -83,7 +82,6 @@ def render_spectrograms_tab(
 def _show_image(img_meta: Dict, *, caption: str) -> None:
     """Load image from URL and plot it."""
     try:
-        st.write("HiRes image URL:", img_meta["url"])
         st.image(img_meta["url"], caption=caption, use_container_width=True)
     except Exception as e:
         st.error(f"Failed to load image: {img_meta['url']}. Error: {e}")

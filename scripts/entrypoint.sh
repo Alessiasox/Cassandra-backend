@@ -1,5 +1,5 @@
 #!/bin/bash
-set -ex
+set -e
 
 # This script mounts a remote directory using sshfs and then starts nginx.
 # It is intended to be the main entrypoint for the 'proxy' container.
@@ -12,6 +12,9 @@ fi
 
 MOUNT_POINT="/usr/share/nginx/html"
 mkdir -p "$MOUNT_POINT"
+
+# Remove known_hosts to avoid prompts
+rm -f /root/.ssh/known_hosts
 
 echo "Attempting to mount ${REMOTE_DIR} from ${SSH_USER}@${SSH_HOST}..."
 
