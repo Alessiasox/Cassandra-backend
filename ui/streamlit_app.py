@@ -13,7 +13,7 @@ import requests
 import pandas as pd
 from datetime import datetime, date, timedelta
 
-from ui.controls import render_sidebar_controls
+from ui.controls import render_sidebar_controls, render_download_buttons
 from ui.tabs.spectrograms import render_spectrograms_tab
 from ui.tabs.waveform import render_waveform_tab
 from ui.tabs.logs import render_logs_tab
@@ -42,13 +42,13 @@ if 'lores_hour' not in ss:
 API_URL = "http://app:8000"
 
 @st.cache_data
-def get_frames_from_backend(selected_date: date) -> list:
-    """Calls the backend to get frame data for a given date."""
+def get_frames_from_backend(selected_station: str, selected_date: date) -> list:
+    """Calls the backend to get frame data for a given station and date."""
     date_str = selected_date.strftime("%y%m%d")
     try:
-        response = requests.get(f"{API_URL}/frames", params={"date": date_str})
+        response = requests.get(f"{API_URL}/frames", params={"station": selected_station, "date": date_str})
         response.raise_for_status()
-        ss.logs.append(f"SUCCESS: Fetched data for {date_str}")
+        ss.logs.append(f"SUCCESS: Fetched data for {selected_station} {date_str}")
         return response.json()
     except requests.exceptions.RequestException as e:
         st.error(f"Failed to fetch data from backend: {e}")
@@ -58,8 +58,7 @@ def get_frames_from_backend(selected_date: date) -> list:
 def main():
     # --- Initialize Session State ---
     if 'logs' not in ss: ss.logs = []
-    
-    st.title("INGV Cassandra Project")
+    st.title("🌋 Cassandra Project — INGV VLF Network")
     st.caption(
         """
         **Cassandra** is an internal visualization and analysis toolkit for the INGV Experimental VLF Network.
@@ -69,7 +68,16 @@ def main():
     
     # --- Sidebar and Data Loading ---
     station, selected_date, mode = render_sidebar_controls()
-    all_frames = get_frames_from_backend(selected_date)
+    # Clear cache if station changes
+    if 'last_station' not in ss or ss.last_station != station:
+        get_frames_from_backend.clear()
+        ss.last_station = station
+    # Use a custom spinner with emojis
+    with st.spinner('Fetching spectrograms and waveforms... 🌋🌊📈 Please wait!'):
+        all_frames = get_frames_from_backend(station, selected_date)
+
+    # Render the sidebar download buttons with the frames
+    render_download_buttons(frames=all_frames)
 
     if not all_frames:
         st.error("No data found for this station/date.")

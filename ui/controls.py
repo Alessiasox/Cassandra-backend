@@ -1,15 +1,16 @@
 import streamlit as st
 import yaml
 from datetime import datetime
+import io
+import zipfile
+import requests
 
 def get_station_list() -> list:
-    """Loads station list from the YAML file."""
+    """Fetch station list from the backend API."""
     try:
-        with open("ssh/stations.yaml", 'r') as f:
-            stations_config = yaml.safe_load(f)
-            return list(stations_config.keys()) if stations_config else []
-    except FileNotFoundError:
-        return ["default"]
+        response = requests.get("http://app:8000/stations")
+        response.raise_for_status()
+        return response.json()
     except Exception:
         return ["default"]
 
@@ -37,17 +38,86 @@ def render_sidebar_controls():
     )
 
     st.sidebar.markdown("---")
-    render_download_buttons()
 
     return station, selected_date, mode
 
+def to_internal_url(url):
+    # Patch browser URL to Docker-internal URL for download
+    if url.startswith("http://localhost:8080/"):
+        return url.replace("http://localhost:8080/", "http://proxy/")
+    return url
 
-def render_download_buttons():
-    """Renders the download buttons in the sidebar."""
+def render_download_buttons(frames=None):
+    """Renders the download buttons in the sidebar. If frames are provided, enables download as ZIP."""
     st.sidebar.header("Download Options")
-    st.sidebar.button("Download All Files", use_container_width=True, disabled=True)
-    st.sidebar.button("Download All WAV Files", use_container_width=True, disabled=True)
-    st.sidebar.button("Download LoRes WAV", use_container_width=True, disabled=True)
-    st.sidebar.button("Download HiRes WAV", use_container_width=True, disabled=True)
-    st.sidebar.button("Download LoRes Spec", use_container_width=True, disabled=True)
-    st.sidebar.button("Download HiRes Spec", use_container_width=True, disabled=True) 
+    can_download = frames is not None and len(frames) > 0
+    # Download All Files
+    if st.sidebar.button("Download All Files", use_container_width=True, disabled=not can_download, key="download_all_files_btn"):
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            for frame in frames:
+                fname = frame.get("url", "").split("/")[-1]
+                try:
+                    # Use internal URL for download
+                    data = requests.get(to_internal_url(frame["url"])).content
+                    zf.writestr(fname, data)
+                except Exception:
+                    pass
+        zip_buffer.seek(0)
+        st.sidebar.download_button(
+            label="Save ZIP",
+            data=zip_buffer,
+            file_name="frames.zip",
+            mime="application/zip",
+            use_container_width=True,
+            key="save_zip_btn"
+        )
+    # Download LoRes Only
+    lores_frames = [f for f in frames or [] if f.get("resolution") == "LoRes"]
+    can_download_lores = len(lores_frames) > 0
+    if st.sidebar.button("Download LoRes Only", use_container_width=True, disabled=not can_download_lores, key="download_lores_only_btn"):
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            for frame in lores_frames:
+                fname = frame.get("url", "").split("/")[-1]
+                try:
+                    data = requests.get(to_internal_url(frame["url"])).content
+                    zf.writestr(fname, data)
+                except Exception:
+                    pass
+        zip_buffer.seek(0)
+        st.sidebar.download_button(
+            label="Save LoRes ZIP",
+            data=zip_buffer,
+            file_name="lores_frames.zip",
+            mime="application/zip",
+            use_container_width=True,
+            key="save_lores_zip_btn"
+        )
+    # Download HiRes Only
+    hires_frames = [f for f in frames or [] if f.get("resolution") == "HiRes"]
+    can_download_hires = len(hires_frames) > 0
+    if st.sidebar.button("Download HiRes Only", use_container_width=True, disabled=not can_download_hires, key="download_hires_only_btn"):
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            for frame in hires_frames:
+                fname = frame.get("url", "").split("/")[-1]
+                try:
+                    data = requests.get(to_internal_url(frame["url"])).content
+                    zf.writestr(fname, data)
+                except Exception:
+                    pass
+        zip_buffer.seek(0)
+        st.sidebar.download_button(
+            label="Save HiRes ZIP",
+            data=zip_buffer,
+            file_name="hires_frames.zip",
+            mime="application/zip",
+            use_container_width=True,
+            key="save_hires_zip_btn"
+        )
+    st.sidebar.button("Download All WAV Files", use_container_width=True, disabled=True, key="download_all_wav_btn")
+    st.sidebar.button("Download LoRes WAV", use_container_width=True, disabled=True, key="download_lores_wav_btn")
+    st.sidebar.button("Download HiRes WAV", use_container_width=True, disabled=True, key="download_hires_wav_btn")
+    st.sidebar.button("Download LoRes Spec", use_container_width=True, disabled=True, key="download_lores_spec_btn")
+    st.sidebar.button("Download HiRes Spec", use_container_width=True, disabled=True, key="download_hires_spec_btn") 

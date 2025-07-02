@@ -3,3 +3,15 @@ CampiFlegrei:
   port:        22
   username:    adriano
   remote_base: C:/htdocs/VLF
+
+ForcaCanapine:
+  host: 100.124.143.25
+  port: 22
+  username: user
+  remote_base: C:/htdocs/VLF
+
+Duronia:
+  host: 100.76.133.15
+  port: 22
+  username: user
+  remote_base: C:/htdocs/VLF

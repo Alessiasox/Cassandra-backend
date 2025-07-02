@@ -38,7 +38,7 @@ services:
     build: .
     env_file: .env
     environment:
-      - FILE_SERVER_URL=http://localhost:8080
+      - FILE_SERVER_URL=http://proxy
     working_dir: /app
     depends_on:
       - app
