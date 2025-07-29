@@ -3,7 +3,7 @@ import os
 import re
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
 import paramiko
 import yaml
 from typing import Dict
@@ -118,6 +118,6 @@ def list_frames_on_demand(
         if normalized_remote_dir.endswith('/'):
             normalized_remote_dir = normalized_remote_dir[:-1]
         relative_path = full_path.replace(normalized_remote_dir, '', 1).lstrip('/')
-        url = f"{FILE_SERVER_URL}/{relative_path}"
+        url = f"{FILE_SERVER_URL}/{station}/{relative_path}"
         frames.append(Frame(station=station, resolution=resolution, timestamp=ts, url=url))
     return frames

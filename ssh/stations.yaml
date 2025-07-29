@@ -15,3 +15,9 @@ Duronia:
   port: 22
   username: user
   remote_base: C:/htdocs/VLF
+
+MonteUrbino:
+  host: 100.97.240.60
+  port: 22
+  username: Adriano
+  remote_base: C:/htdocs/VLF
