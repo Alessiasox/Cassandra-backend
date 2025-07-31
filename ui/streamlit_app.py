@@ -16,8 +16,36 @@ from datetime import datetime, date, timedelta
 from ui.controls import render_sidebar_controls, render_download_buttons
 from ui.tabs.spectrograms import render_spectrograms_tab
 from ui.tabs.waveform import render_waveform_tab
+from ui.tabs.ai import render_ai_tab
 from ui.tabs.logs import render_logs_tab
 from ui.utils.viewer_utils import generate_timeline
+
+# --- Timestamp Parsing Helper ---
+def parse_timestamp(timestamp_str):
+    """Parse timestamp string handling Z suffix and various ISO formats"""
+    if timestamp_str.endswith('Z'):
+        # Remove Z and add explicit UTC offset
+        timestamp_str = timestamp_str[:-1] + '+00:00'
+    elif '+' not in timestamp_str and 'T' in timestamp_str:
+        # Add UTC offset if missing
+        timestamp_str += '+00:00'
+    
+    try:
+        return datetime.fromisoformat(timestamp_str)
+    except ValueError:
+        # Fallback parsing for edge cases
+        try:
+            # Try without timezone info
+            if timestamp_str.endswith('+00:00'):
+                base_str = timestamp_str[:-6]
+                dt = datetime.fromisoformat(base_str)
+                return dt.replace(tzinfo=None)  # Return as naive datetime for consistency
+            else:
+                return datetime.fromisoformat(timestamp_str)
+        except ValueError:
+            # Last resort - return current time
+            st.warning(f"Could not parse timestamp: {timestamp_str}")
+            return datetime.now()
 
 # --- Image Display Helper ---
 def _show_image(img_meta, caption: str):
@@ -76,7 +104,7 @@ def main():
     with st.spinner('Fetching spectrograms and waveforms... 🌋🌊📈 Please wait!'):
         all_frames = get_frames_from_backend(station, selected_date)
 
-    # Render the sidebar download buttons with the frames
+    # Render the working sidebar download buttons (ZIP downloads)
     render_download_buttons(frames=all_frames)
 
     if not all_frames:
@@ -85,7 +113,7 @@ def main():
 
     # --- Timeline and Window Controls ---
     lores_frames = [f for f in all_frames if f['resolution'] == 'LoRes']
-    all_timestamps = [datetime.fromisoformat(f['timestamp']) for f in lores_frames]
+    all_timestamps = [parse_timestamp(f['timestamp']) for f in lores_frames]
     
     if not all_timestamps:
         st.warning("No LoRes frames found to build timeline.")
@@ -140,13 +168,27 @@ def main():
         rng_start = ss["lores_hour"]
         rng_end = rng_start + timedelta(hours=1)
 
+    # --- Ensure time range variables are always defined ---
+    if 'rng_start' not in locals() or 'rng_end' not in locals():
+        # Fallback time range if no data was loaded
+        default_time = datetime.now().replace(minute=0, second=0, microsecond=0)
+        rng_start = default_time
+        rng_end = default_time + timedelta(hours=1)
+    
     # --- Render Tabs ---
-    tab_spec, tab_wav, tab_logs = st.tabs(["Spectrograms", "Waveform + AI", "Logs"])
+    tab_spec, tab_wav, tab_ai, tab_logs = st.tabs(["Spectrograms", "Waveforms", "AI Inference", "Logs"])
 
     with tab_spec:
         render_spectrograms_tab(all_frames=all_frames, control_mode=mode, window_start=rng_start, window_end=rng_end, session_state=ss)
     with tab_wav:
-        render_waveform_tab(ss=ss)
+        # Pass station, date, time range, and control mode to avoid duplicate sidebar rendering
+        date_str = selected_date.strftime("%y%m%d")
+        render_waveform_tab(station, date_str, rng_start, rng_end, mode, ss)
+    
+    with tab_ai:
+        # Dedicated AI inference tab
+        render_ai_tab(ss)
+    
     with tab_logs:
         render_logs_tab(ss=ss)
 

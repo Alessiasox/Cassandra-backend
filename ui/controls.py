@@ -116,8 +116,4 @@ def render_download_buttons(frames=None):
             use_container_width=True,
             key="save_hires_zip_btn"
         )
-    st.sidebar.button("Download All WAV Files", use_container_width=True, disabled=True, key="download_all_wav_btn")
-    st.sidebar.button("Download LoRes WAV", use_container_width=True, disabled=True, key="download_lores_wav_btn")
-    st.sidebar.button("Download HiRes WAV", use_container_width=True, disabled=True, key="download_hires_wav_btn")
-    st.sidebar.button("Download LoRes Spec", use_container_width=True, disabled=True, key="download_lores_spec_btn")
-    st.sidebar.button("Download HiRes Spec", use_container_width=True, disabled=True, key="download_hires_spec_btn") 
+    

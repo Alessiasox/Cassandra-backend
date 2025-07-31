@@ -6,3 +6,6 @@ paramiko
 pytest
 pandas
 PyYAML
+plotly
+numpy
+scipy
