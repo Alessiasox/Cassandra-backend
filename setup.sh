@@ -204,6 +204,18 @@ copy_ssh_keys() {
 start_app() {
     print_step "Starting VLF Network Monitoring System..."
     
+    # Clean up any existing containers to prevent conflicts
+    print_step "Cleaning up existing containers..."
+    docker-compose down 2>/dev/null || true
+    
+    # Stop and remove any remaining cassandra containers that might conflict
+    existing_containers=$(docker ps -aq --filter "name=cassandra" 2>/dev/null)
+    if [ ! -z "$existing_containers" ]; then
+        docker stop $existing_containers 2>/dev/null || true
+        docker rm -f $existing_containers 2>/dev/null || true
+    fi
+    print_success "Container cleanup complete"
+    
     docker-compose build
     docker-compose up -d
     
