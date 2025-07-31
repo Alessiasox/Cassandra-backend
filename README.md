@@ -225,6 +225,17 @@ C:/htdocs/VLF/
 
 ### Common Issues
 
+**Container name conflicts:**
+```bash
+# Quick cleanup
+./cleanup.sh
+
+# Or manual cleanup
+docker-compose down
+docker stop $(docker ps -aq --filter "name=cassandra")
+docker rm -f $(docker ps -aq --filter "name=cassandra")
+```
+
 **"Connection refused" errors:**
 ```bash
 # Check if all containers are running
