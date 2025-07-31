@@ -19,16 +19,16 @@ A comprehensive web-based application for monitoring Very Low Frequency (VLF) el
 
 **For macOS/Linux:**
 ```bash
-git clone https://github.com/your-repo/vlf-network-monitoring.git
-cd vlf-network-monitoring
+git clone https://github.com/Alessiasox/Cassandra-backend.git
+cd Cassandra-backend
 chmod +x setup.sh
 ./setup.sh
 ```
 
 **For Windows:**
 ```powershell
-git clone https://github.com/your-repo/vlf-network-monitoring.git
-cd vlf-network-monitoring
+git clone https://github.com/Alessiasox/Cassandra-backend.git
+cd Cassandra-backend
 # Run PowerShell as Administrator
 .\setup.ps1
 ```
@@ -44,8 +44,8 @@ cd vlf-network-monitoring
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-repo/vlf-network-monitoring.git
-   cd vlf-network-monitoring
+   git clone https://github.com/Alessiasox/Cassandra-backend.git
+   cd Cassandra-backend
    ```
 
 2. **Generate SSH keys:**
@@ -259,8 +259,8 @@ docker-compose restart
 ### Local Development Setup
 ```bash
 # Clone repository
-git clone https://github.com/your-repo/vlf-network-monitoring.git
-cd vlf-network-monitoring
+git clone https://github.com/Alessiasox/Cassandra-backend.git
+cd Cassandra-backend
 
 # Start development environment
 docker-compose -f docker-compose.dev.yml up
@@ -281,21 +281,14 @@ docker-compose logs -f ui
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+??
 
 ## 🤝 Support
 
-- **Documentation:** [Wiki](https://github.com/your-repo/vlf-network-monitoring/wiki)
-- **Issues:** [GitHub Issues](https://github.com/your-repo/vlf-network-monitoring/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/your-repo/vlf-network-monitoring/discussions)
-- **Email:** support@your-domain.com
+??
 
 ## 🌟 Acknowledgments
 
-- **INGV** - Istituto Nazionale di Geofisica e Vulcanologia
-- **VLF Research Community** - For data formats and analysis methods
-- **Open Source Contributors** - All the amazing tools that make this possible
+??
 
 ---
-
-**Built with ❤️ for VLF electromagnetic research**
