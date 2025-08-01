@@ -1,9 +1,11 @@
-# VLF Network Monitoring System - Windows Setup Script
-# Run this in PowerShell as Administrator
+# VLF Network Monitoring System - Windows Setup
+# Requires Administrator privileges
 
-param(
-    [switch]$Force
-)
+# Check if running as administrator
+if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Write-Host "This script requires Administrator privileges. Please run PowerShell as Administrator." -ForegroundColor Red
+    exit 1
+}
 
 Write-Host "🌋 VLF Network Monitoring System - Windows Setup" -ForegroundColor Cyan
 Write-Host "=================================================" -ForegroundColor Cyan
@@ -29,17 +31,10 @@ function Write-Error {
     Write-Host "[✗] $Message" -ForegroundColor Red
 }
 
-# Check if running as administrator
-function Test-Administrator {
-    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
-    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-}
-
-# Install Chocolatey package manager
+# Install Chocolatey
 function Install-Chocolatey {
-    Write-Step "Installing Chocolatey package manager..."
     if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
+        Write-Step "Installing Chocolatey package manager..."
         Set-ExecutionPolicy Bypass -Scope Process -Force
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
         iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
@@ -49,8 +44,8 @@ function Install-Chocolatey {
     }
 }
 
-# Install Docker Desktop
-function Install-Docker {
+# Check Docker installation
+function Check-Docker {
     Write-Step "Checking Docker installation..."
     
     if (!(Get-Command docker -ErrorAction SilentlyContinue)) {
@@ -61,15 +56,14 @@ function Install-Docker {
         Write-Warning "2. Launch Docker Desktop"
         Write-Warning "3. Enable WSL 2 integration"
         Write-Warning "4. Run this script again"
-        pause
-        exit
+        exit 0
     } else {
         Write-Success "Docker found"
     }
 }
 
-# Install Git
-function Install-Git {
+# Check Git installation
+function Check-Git {
     Write-Step "Checking Git installation..."
     
     if (!(Get-Command git -ErrorAction SilentlyContinue)) {
@@ -106,8 +100,8 @@ function Setup-SSH {
     Write-Warning "Please add this public key to your VLF stations' authorized_keys"
 }
 
-# Install Tailscale
-function Install-Tailscale {
+# Setup Tailscale
+function Setup-Tailscale {
     Write-Step "Setting up Tailscale..."
     
     if (!(Get-Command tailscale -ErrorAction SilentlyContinue)) {
@@ -129,7 +123,7 @@ function Setup-Config {
         Write-Step "Creating station configuration..."
         New-Item -ItemType Directory -Path "ssh" -Force | Out-Null
         
-        $config = @"
+        $config = @'
 # VLF Network Stations Configuration
 # Add your stations here following this format:
 
@@ -144,7 +138,7 @@ CampiFlegrei:
   port: 22
   username: username  # Replace with your station's username
   remote_base: C:/htdocs/VLF
-"@
+'@
         $config | Out-File -FilePath "ssh\stations.yaml" -Encoding UTF8
         Write-Warning "Please edit ssh\stations.yaml with your actual station details"
     } else {
@@ -157,12 +151,12 @@ function Create-Environment {
     Write-Step "Creating environment file..."
     
     if (!(Test-Path ".env")) {
-        $env = @"
+        $env = @'
 # VLF Network Environment Configuration
 SSH_PRIVATE_KEY_PATH=/app/ssh/id_ed25519
 FILE_SERVER_URL=http://localhost:8080
 COMPOSE_PROJECT_NAME=vlf-network
-"@
+'@
         $env | Out-File -FilePath ".env" -Encoding UTF8
         Write-Success "Environment file created"
     } else {
@@ -174,47 +168,59 @@ COMPOSE_PROJECT_NAME=vlf-network
 function Copy-SSHKeys {
     Write-Step "Copying SSH keys to project..."
     
-    New-Item -ItemType Directory -Path "ssh" -Force | Out-Null
-    Copy-Item "$env:USERPROFILE\.ssh\id_ed25519" "ssh\" -Force
-    Copy-Item "$env:USERPROFILE\.ssh\id_ed25519.pub" "ssh\" -Force
+    $sshSourceDir = "$env:USERPROFILE\.ssh"
+    $sshTargetDir = "ssh"
+    
+    if (!(Test-Path $sshTargetDir)) {
+        New-Item -ItemType Directory -Path $sshTargetDir -Force | Out-Null
+    }
+    
+    Copy-Item "$sshSourceDir\id_ed25519" "$sshTargetDir\" -Force
+    Copy-Item "$sshSourceDir\id_ed25519.pub" "$sshTargetDir\" -Force
     
     Write-Success "SSH keys copied"
 }
 
-# Start application
+# Start the application
 function Start-Application {
     Write-Step "Starting VLF Network Monitoring System..."
+    
+    # Clean up any existing containers to prevent conflicts
+    Write-Step "Cleaning up existing containers..."
+    docker-compose down 2>$null
+    
+    # Stop and remove any remaining cassandra containers
+    $existing = docker ps -aq --filter "name=cassandra" 2>$null
+    if ($existing) {
+        docker stop $existing 2>$null
+        docker rm -f $existing 2>$null
+    }
+    Write-Success "Container cleanup complete"
     
     docker-compose build
     docker-compose up -d
     
-    Write-Success "Application started!"
+    Write-Success "Application started successfully!"
     Write-Host ""
     Write-Host "🌐 Access the application at: http://localhost:8501" -ForegroundColor Cyan
     Write-Host "📊 Backend API at: http://localhost:8000" -ForegroundColor Cyan
     Write-Host "📁 File server at: http://localhost:8080" -ForegroundColor Cyan
     Write-Host ""
-    Write-Warning "Make sure all VLF stations have:"
-    Write-Warning "1. Tailscale running"
-    Write-Warning "2. SSH server enabled"
-    Write-Warning "3. Your SSH public key authorized"
+    Write-Warning "Make sure all your VLF stations are:"
+    Write-Warning "1. Connected to Tailscale"
+    Write-Warning "2. Have SSH server running"
+    Write-Warning "3. Have your SSH public key in authorized_keys"
 }
 
-# Main setup flow
+# Main execution
 function Main {
-    if (!(Test-Administrator)) {
-        Write-Error "Please run this script as Administrator"
-        pause
-        exit 1
-    }
-    
     Write-Step "Starting Windows setup..."
     
     Install-Chocolatey
-    Install-Docker
-    Install-Git
+    Check-Docker
+    Check-Git
     Setup-SSH
-    Install-Tailscale
+    Setup-Tailscale
     Setup-Config
     Create-Environment
     Copy-SSHKeys
